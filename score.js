@@ -175,21 +175,24 @@
   }
 
   // Compact mode toggle for mobile (single-screen) + details button visibility
-  function updateCompact() {
-    const isMobile = window.matchMedia('(max-width: 480px)').matches;
-    const shouldCompact = isMobile && match.started && !match.matchOver;
-    document.body.classList.toggle('compact', shouldCompact);
+function updateCompact() {
+  const isMobile = window.matchMedia('(max-width: 480px)').matches;
+  // ✅ Keep compact mode even after the match finishes
+  const shouldCompact = isMobile && match.started; // (removed "!match.matchOver")
+  document.body.classList.toggle('compact', shouldCompact);
 
-    // Show details button only when compact and match started
-    const showToggle = shouldCompact && match.started;
-    elToggleDetails.classList.toggle('hidden', !showToggle);
+  // Show the details button whenever we're in compact mode (match started),
+  // including after match end so users can expand summaries.
+  const showToggle = shouldCompact && match.started;
+  elToggleDetails.classList.toggle('hidden', !showToggle);
 
-    // If leaving compact mode, also clear details state
-    if (!shouldCompact) {
-      document.body.classList.remove('details');
-      updateDetailsButtonLabel();
-    }
+  // If we leave compact mode (e.g., rotate to desktop width), clear details state
+  if (!shouldCompact) {
+    document.body.classList.remove('details');
+    updateDetailsButtonLabel();
   }
+}
+
 
   // Details toggle behavior
   function updateDetailsButtonLabel() {
@@ -482,23 +485,29 @@
   }
 
   function decideMatch() {
-    const A = match.innings[TEAM_A];
-    const B = match.innings[TEAM_B];
-    match.matchOver = true;
+  const A = match.innings[TEAM_A];
+  const B = match.innings[TEAM_B];
+  match.matchOver = true;
 
-    if (B.runs > A.runs) {
-      elStatus.className = 'status ok';
-      elStatus.textContent = `✅ ${B.name} win.`;
-    } else if (B.runs < A.runs) {
-      elStatus.className = 'status bad';
-      elStatus.textContent = `❌ ${B.name} fall short by ${A.runs - B.runs} run(s).`;
-    } else {
-      elStatus.className = 'status';
-      elStatus.textContent = '⏸️ Match tied.';
-    }
-    setScoringEnabled(false);
-    updateCompact();
+  if (B.runs > A.runs) {
+    // B chased successfully (you still show wickets/balls elsewhere on instant win)
+    elStatus.className = 'status ok';
+    elStatus.textContent = `✅ ${B.name} win.`;
+  } else if (B.runs < A.runs) {
+    // A defended: show run-margin instead of "Team B fall short..."
+    const margin = A.runs - B.runs;
+    const word = margin === 1 ? 'run' : 'runs';
+    elStatus.className = 'status ok';
+    elStatus.textContent = `✅ ${A.name} won the match by ${margin} ${word}.`;
+  } else {
+    elStatus.className = 'status';
+    elStatus.textContent = '⏸️ Match tied.';
   }
+
+  setScoringEnabled(false);
+  updateCompact();
+}
+
 
   // ------ WIRE UI ------
   elStart.addEventListener('click', startMatch);
