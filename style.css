@@ -191,12 +191,50 @@ button:disabled { opacity: .5; cursor: not-allowed; filter: grayscale(.2); }
   .cards { grid-template-columns: 1fr; }
 }
 
-/* Optional: keep controls visible on longer pages (desktop) */
-@media (min-width: 600px) {
-  .controls {
-    position: sticky; bottom: 0;
-    background: linear-gradient(180deg, rgba(11,102,35,0), rgba(11,102,35,.6));
-    backdrop-filter: blur(6px);
-    padding-bottom: 16px;
+/* ===== Mobile single-screen compact mode ===== */
+@media (max-width: 480px) {
+  /* Fill the screen in 3 rows: title, content, controls */
+  .wrap {
+    min-height: 100svh; /* modern */
+    min-height: 100dvh; /* safari 16+ */
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    margin: 12px auto;
   }
+
+  /* Hide setup when compact (JS toggles body.compact) */
+  body.compact .setup { display: none; }
+
+  h1 { font-size: 1.1rem; margin: 0 0 6px; }
+
+  .cards {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-top: 8px;
+    overflow: hidden; /* avoid page scroll */
+  }
+
+  .card { padding: 10px; }
+  .card-header h2 { font-size: 1rem; }
+  .badge { font-size: 10px; padding: 4px 8px; }
+
+  .scoreline strong { font-size: 1.5rem; }
+  .rr { margin-left: 6px; }
+  /* Trim less-critical info to keep single-screen */
+  .hint, .over-summary { display: none !important; }
+  .extras small { display: none; }
+
+  .status { font-size: .9rem; padding: 8px; margin-top: 8px; }
+
+  .controls {
+    position: sticky;
+    bottom: 0;
+    background: linear-gradient(180deg, rgba(11,102,35,0), rgba(11,102,35,.8));
+    backdrop-filter: blur(6px);
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    padding-top: 6px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+  .controls button { min-height: 44px; font-size: .95rem; padding: 10px 0; }
 }
