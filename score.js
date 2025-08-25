@@ -60,9 +60,12 @@
   // Controls
   const btn = {
     dot: $('dot'), r1: $('r1'), r2: $('r2'), r3: $('r3'), r4: $('r4'), r6: $('r6'),
-    wkt: $('wkt'), wd: $('wd'), nb: $('nb'), end: $('endInnings')
+    wkt: $('wkt'), wd: $('wd'), nb: $('nb'),
+    undo: $('undo'), end: $('endInnings')
   };
-  const allControlIds = ['dot','r1','r2','r3','r4','r6','wkt','wd','nb','end'];
+
+  // Scoring buttons that should disable when you can't score
+  const scoringBtnIds = ['dot','r1','r2','r3','r4','r6','wkt','wd','nb','end'];
 
   // ------ STATE HELPERS ------
   const oversStr = (balls) => `${Math.floor(balls/6)}.${balls%6}`;
@@ -96,11 +99,33 @@
     target: null         // Team B target = Team A runs + 1
   };
 
+  // History stack for Undo (snapshots before each scoring action)
+  const history = [];
+  const snapshot = () => JSON.parse(JSON.stringify(match));
+  function pushHistory() { history.push(snapshot()); }
+  function undoLast() {
+    if (!history.length) return;
+    const prev = history.pop();
+    // Restore top-level fields
+    match.maxOvers   = prev.maxOvers;
+    match.maxBalls   = prev.maxBalls;
+    match.maxWickets = prev.maxWickets;
+    match.batting    = prev.batting;
+    match.innings    = prev.innings;
+    match.started    = prev.started;
+    match.matchOver  = prev.matchOver;
+    match.target     = prev.target;
+    render();
+  }
+
   const curr  = () => match.innings[match.batting];
   const other = () => match.innings[match.batting === TEAM_A ? TEAM_B : TEAM_A];
 
-  function setControlsEnabled(enabled) {
-    allControlIds.forEach(id => { const b = btn[id]; if (b) b.disabled = !enabled; });
+  function setScoringEnabled(enabled) {
+    scoringBtnIds.forEach(id => { const b = btn[id]; if (b) b.disabled = !enabled; });
+  }
+  function updateUndoEnabled() {
+    if (btn.undo) btn.undo.disabled = history.length === 0;
   }
 
   // Badge helper
@@ -130,7 +155,7 @@
     }
   }
 
-  // NEW: close current innings immediately
+  // Close current innings immediately
   function closeCurrentInnings() {
     const c = curr();
     if (c.concluded) return;
@@ -279,16 +304,33 @@
       elChaseBox.classList.add('hidden');
     }
 
-    // Status line (general)
+    // Status line (always keep fresh to avoid stale messages after undo)
     if (!match.started) {
       elStatus.className = 'status';
       elStatus.textContent = 'Set up the match to begin.';
+    } else if (!match.matchOver) {
+      if (match.batting === TEAM_A) {
+        elStatus.className = 'status';
+        elStatus.textContent = `${A.name} are batting.`;
+      } else {
+        if (match.target != null) {
+          const ballsLeft = Math.max(0, match.maxBalls - B.balls);
+          const need = Math.max(0, match.target - B.runs);
+          elStatus.className = 'status';
+          elStatus.textContent = `Chase on: ${B.name} need ${need} off ${ballsLeft} balls.`;
+        } else {
+          elStatus.className = 'status';
+          elStatus.textContent = `${B.name} are batting.`;
+        }
+      }
     }
+    // If match.matchOver === true, keep whatever final message was set
 
     // Controls availability
     const c = curr();
     const canScore = match.started && !match.matchOver && !c.concluded && (match.maxBalls == null || c.balls < match.maxBalls);
-    setControlsEnabled(canScore);
+    setScoringEnabled(canScore);
+    updateUndoEnabled();
 
     // Over summaries
     renderOvers(match.innings[TEAM_A], elOversAList);
@@ -322,6 +364,9 @@
     match.matchOver = false;
     match.target    = null;
 
+    // Clear history at match start
+    history.length = 0;
+
     elStatus.textContent = `Match started. ${nameA} are batting first. (${match.maxWickets} wicket innings)`;
     render();
   }
@@ -341,8 +386,9 @@
     match.matchOver= false;
     match.target   = null;
 
-    // Clear UI states
+    // Clear UI states and history
     document.body.classList.remove('compact', 'details');
+    history.length = 0;
 
     render();
   }
@@ -355,6 +401,7 @@
   // Legal deliveries (advance ball)
   function addRuns(r) {
     if (!ensureInningsOpen()) return;
+    pushHistory();
     const c = curr();
     c.runs += r;
     c.balls += 1;                 // advance ball
@@ -364,6 +411,7 @@
 
   function wicket() {
     if (!ensureInningsOpen()) return;
+    pushHistory();
     const c = curr();
     if (c.wickets < match.maxWickets) {
       c.wickets += 1;
@@ -376,6 +424,7 @@
   // Extras (do NOT advance ball)
   function wide() {
     if (!ensureInningsOpen()) return;
+    pushHistory();
     const c = curr();
     c.runs += 1;
     c.wides += 1;
@@ -385,6 +434,7 @@
 
   function noBall() {
     if (!ensureInningsOpen()) return;
+    pushHistory();
     const c = curr();
     c.runs += 1;
     c.noballs += 1;
@@ -395,6 +445,7 @@
   function endInningsManual() {
     const c = curr();
     if (!match.started || c.concluded || match.matchOver) return;
+    pushHistory();
     closeCurrentInnings();
     render();
   }
@@ -424,7 +475,7 @@
         finalizeCurrentOver(B);     // push partial live over
         elStatus.className = 'status ok';
         elStatus.textContent = `✅ ${B.name} win with ${Math.max(0, match.maxBalls - B.balls)} ball(s) left and ${match.maxWickets - B.wickets} wicket(s).`;
-        setControlsEnabled(false);
+        setScoringEnabled(false);
         updateCompact();            // keep compact mode until new match
       }
     }
@@ -445,7 +496,7 @@
       elStatus.className = 'status';
       elStatus.textContent = '⏸️ Match tied.';
     }
-    setControlsEnabled(false);
+    setScoringEnabled(false);
     updateCompact();
   }
 
@@ -464,6 +515,7 @@
   btn.wd .addEventListener('click', wide);
   btn.nb .addEventListener('click', noBall);
 
+  btn.undo.addEventListener('click', undoLast);
   btn.end.addEventListener('click', endInningsManual);
 
   // Details toggle
@@ -477,6 +529,7 @@
     'w': wicket, 'W': wicket,
     'q': wide,   'Q': wide,
     'n': noBall, 'N': noBall,
+    'u': undoLast, 'U': undoLast,
     'x': endInningsManual, 'X': endInningsManual
   };
   document.addEventListener('keydown', (e) => {
@@ -493,5 +546,7 @@
   render();
 
   // Expose for console debugging
-  window._score2 = { startMatch, newMatch, addRuns, wicket, wide, noBall, endInningsManual, match };
+  window._score2 = {
+    startMatch, newMatch, addRuns, wicket, wide, noBall, endInningsManual, undoLast, match
+  };
 })();
