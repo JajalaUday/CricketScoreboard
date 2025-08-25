@@ -129,30 +129,32 @@
     }
   }
 
-  // NEW: single function to close the current innings immediately
+  // NEW: close current innings immediately
   function closeCurrentInnings() {
     const c = curr();
     if (c.concluded) return;
 
-    // capture partial live over
-    finalizeCurrentOver(c);
-
+    finalizeCurrentOver(c); // capture partial live over
     c.concluded = true;
 
     if (match.batting === TEAM_A) {
-      // set target and move to Team B
       const A = match.innings[TEAM_A];
       match.target = A.runs + 1;
       match.batting = TEAM_B;
       elStatus.className = 'status';
       elStatus.textContent = `Second innings begins. ${match.innings[TEAM_B].name} need ${match.target} to win.`;
     } else {
-      // end match after second innings
       decideMatch();
     }
   }
 
-  // hard guard — do nothing if the innings already hit the balls cap
+  // Compact mode toggle for mobile (single-screen)
+  function updateCompact() {
+    const isMobile = window.matchMedia('(max-width: 480px)').matches;
+    document.body.classList.toggle('compact', isMobile && match.started && !match.matchOver);
+  }
+
+  // Guard: stop scoring if innings closed
   function ensureInningsOpen() {
     const c = curr();
     if (match.maxBalls != null && c.balls >= match.maxBalls) {
@@ -259,7 +261,7 @@
       elStatus.textContent = 'Set up the match to begin.';
     }
 
-    // Controls availability based on current innings
+    // Controls availability
     const c = curr();
     const canScore = match.started && !match.matchOver && !c.concluded && (match.maxBalls == null || c.balls < match.maxBalls);
     setControlsEnabled(canScore);
@@ -267,6 +269,9 @@
     // Over summaries
     renderOvers(match.innings[TEAM_A], elOversAList);
     renderOvers(match.innings[TEAM_B], elOversBList);
+
+    // Apply/clear compact mode depending on screen & match state
+    updateCompact();
   }
 
   // ------ CORE LOGIC ------
@@ -295,6 +300,7 @@
     elStatus.textContent = `Match started. ${nameA} are batting first. (${match.maxWickets} wicket innings)`;
     render();
   }
+
   function newMatch() {
     elTeamAName.value = '';
     elTeamBName.value = '';
@@ -303,7 +309,7 @@
 
     match.maxOvers = null;
     match.maxBalls = null;
-    match.maxWickets = 20;
+    match.maxWickets = 10;
     match.batting  = TEAM_A;
     match.innings  = [blankInnings('Team A'), blankInnings('Team B')];
     match.started  = false;
@@ -390,6 +396,7 @@
         elStatus.className = 'status ok';
         elStatus.textContent = `✅ ${B.name} win with ${Math.max(0, match.maxBalls - B.balls)} ball(s) left and ${match.maxWickets - B.wickets} wicket(s).`;
         setControlsEnabled(false);
+        updateCompact();            // keep compact mode until new match
       }
     }
   }
@@ -410,6 +417,7 @@
       elStatus.textContent = '⏸️ Match tied.';
     }
     setControlsEnabled(false);
+    updateCompact();
   }
 
   // ------ WIRE UI ------
@@ -428,6 +436,7 @@
   btn.nb .addEventListener('click', noBall);
 
   btn.end.addEventListener('click', endInningsManual);
+
   // Keyboard shortcuts (ignored when typing in inputs)
   const keymap = {
     '0': () => addRuns(0), '.': () => addRuns(0),
@@ -444,6 +453,9 @@
     const fn = keymap[e.key];
     if (fn) { e.preventDefault(); fn(); }
   });
+
+  // Keep compact mode in sync with orientation/resize
+  window.addEventListener('resize', updateCompact);
 
   // Initial paint
   render();
