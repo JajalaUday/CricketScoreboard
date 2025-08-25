@@ -111,6 +111,21 @@ button:disabled { opacity: .5; cursor: not-allowed; filter: grayscale(.2); }
 .status.ok { color: var(--ok); border-left-color: var(--ok); }
 .status.bad { color: var(--danger); border-left-color: var(--danger); }
 
+/* Mobile-only details toggle button */
+.toggle-details {
+  display: none;
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent2);
+  color: #000;
+  font-weight: 800;
+  cursor: pointer;
+}
+.toggle-details:active { transform: translateY(1px); }
+
 .controls {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
@@ -193,12 +208,11 @@ button:disabled { opacity: .5; cursor: not-allowed; filter: grayscale(.2); }
 
 /* ===== Mobile single-screen compact mode ===== */
 @media (max-width: 480px) {
-  /* Fill the screen in 3 rows: title, content, controls */
   .wrap {
-    min-height: 100svh; /* modern */
-    min-height: 100dvh; /* safari 16+ */
+    min-height: 100svh;
+    min-height: 100dvh;
     display: grid;
-    grid-template-rows: auto 1fr auto;
+    grid-template-rows: auto auto 1fr auto; /* title, setup/status/toggle, cards, controls */
     margin: 12px auto;
   }
 
@@ -207,11 +221,14 @@ button:disabled { opacity: .5; cursor: not-allowed; filter: grayscale(.2); }
 
   h1 { font-size: 1.1rem; margin: 0 0 6px; }
 
+  /* Show the toggle button on mobile */
+  .toggle-details { display: block; }
+
   .cards {
     grid-template-columns: 1fr;
     gap: 8px;
     margin-top: 8px;
-    overflow: hidden; /* avoid page scroll */
+    overflow: hidden; /* non-details: no scroll */
   }
 
   .card { padding: 10px; }
@@ -220,9 +237,14 @@ button:disabled { opacity: .5; cursor: not-allowed; filter: grayscale(.2); }
 
   .scoreline strong { font-size: 1.5rem; }
   .rr { margin-left: 6px; }
-  /* Trim less-critical info to keep single-screen */
+
+  /* Compact hides details by default */
   .hint, .over-summary { display: none !important; }
-  .extras small { display: none; }
+
+  /* When user taps 'Show details', reveal and allow scroll */
+  body.details .hint,
+  body.details .over-summary { display: block !important; }
+  body.details .cards { overflow: auto; }
 
   .status { font-size: .9rem; padding: 8px; margin-top: 8px; }
 
