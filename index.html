@@ -2,15 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <!-- viewport-fit=cover for iPhone safe areas -->
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-  <title>Roby Scoreboard</title>
-  <link rel="stylesheet" href="style.css"/>
-  <script src="score.js" defer></script>
+  <title>Scoreboard</title>
+  <link rel="stylesheet" href="./style.css"/>
+  <script src="./score.js" defer></script>
 </head>
 <body>
   <div class="wrap">
-    <h1>Roby Scoreboard</h1>
+    <h1>Scoreboard</h1>
 
     <!-- Match setup -->
     <div class="setup">
@@ -115,7 +114,8 @@
       <button id="wd" class="secondary">Wide (+1)</button>
       <button id="nb" class="secondary">No Ball (+1)</button>
 
-      <!-- innings/match -->
+      <!-- undo & innings/match -->
+      <button id="undo" class="secondary">Undo</button>
       <button id="endInnings" class="warn">End Innings</button>
     </div>
   </div>
