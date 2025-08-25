@@ -51,8 +51,9 @@
   const elBallsLeft = $('ballsLeftVal');
   const elReqRR     = $('reqRR');
 
-  // Status
+  // Status & mobile toggle
   const elStatus = $('status');
+  const elToggleDetails = $('toggleDetails');
   elStatus.setAttribute('role', 'status');
   elStatus.setAttribute('aria-live', 'polite');
 
@@ -148,10 +149,33 @@
     }
   }
 
-  // Compact mode toggle for mobile (single-screen)
+  // Compact mode toggle for mobile (single-screen) + details button visibility
   function updateCompact() {
     const isMobile = window.matchMedia('(max-width: 480px)').matches;
-    document.body.classList.toggle('compact', isMobile && match.started && !match.matchOver);
+    const shouldCompact = isMobile && match.started && !match.matchOver;
+    document.body.classList.toggle('compact', shouldCompact);
+
+    // Show details button only when compact and match started
+    const showToggle = shouldCompact && match.started;
+    elToggleDetails.classList.toggle('hidden', !showToggle);
+
+    // If leaving compact mode, also clear details state
+    if (!shouldCompact) {
+      document.body.classList.remove('details');
+      updateDetailsButtonLabel();
+    }
+  }
+
+  // Details toggle behavior
+  function updateDetailsButtonLabel() {
+    const on = document.body.classList.contains('details');
+    elToggleDetails.textContent = on ? 'Hide details' : 'Show details';
+    elToggleDetails.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+  function toggleDetails() {
+    if (!document.body.classList.contains('compact')) return;
+    document.body.classList.toggle('details');
+    updateDetailsButtonLabel();
   }
 
   // Guard: stop scoring if innings closed
@@ -270,8 +294,9 @@
     renderOvers(match.innings[TEAM_A], elOversAList);
     renderOvers(match.innings[TEAM_B], elOversBList);
 
-    // Apply/clear compact mode depending on screen & match state
+    // Apply/clear compact mode and manage details toggle label
     updateCompact();
+    updateDetailsButtonLabel();
   }
 
   // ------ CORE LOGIC ------
@@ -315,6 +340,10 @@
     match.started  = false;
     match.matchOver= false;
     match.target   = null;
+
+    // Clear UI states
+    document.body.classList.remove('compact', 'details');
+
     render();
   }
 
@@ -437,6 +466,9 @@
 
   btn.end.addEventListener('click', endInningsManual);
 
+  // Details toggle
+  elToggleDetails.addEventListener('click', toggleDetails);
+
   // Keyboard shortcuts (ignored when typing in inputs)
   const keymap = {
     '0': () => addRuns(0), '.': () => addRuns(0),
@@ -455,7 +487,7 @@
   });
 
   // Keep compact mode in sync with orientation/resize
-  window.addEventListener('resize', updateCompact);
+  window.addEventListener('resize', () => { updateCompact(); updateDetailsButtonLabel(); });
 
   // Initial paint
   render();
