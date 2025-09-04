@@ -95,12 +95,8 @@
     <!-- Status bar -->
     <div id="status" class="status">Set up the match to begin.</div>
 
-    <!-- Mobile-only details toggle -->
-    <button id="toggleDetails" class="toggle-details hidden" aria-pressed="false">Show details</button>
-
-    <!-- Controls (always control the CURRENT batting team) -->
+    <!-- Controls -->
     <div class="controls">
-      <!-- legal deliveries (advance ball) -->
       <button id="dot">Dot</button>
       <button id="r1">+1</button>
       <button id="r2">+2</button>
@@ -108,14 +104,37 @@
       <button id="r4">+4</button>
       <button id="r6">+6</button>
       <button id="wkt">Wicket</button>
-
-      <!-- extras (do NOT advance the ball) -->
       <button id="wd" class="secondary">Wide (+1)</button>
       <button id="nb" class="secondary">No Ball (+1)</button>
-
-      <!-- undo & innings/match -->
       <button id="undo" class="secondary">Undo</button>
       <button id="endInnings" class="warn">End Innings</button>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <button id="refreshBtn" aria-label="Refresh scores">🔄 Refresh</button>
+    <span id="lastUpdated" style="margin-left:8px; font-size:0.9rem; opacity:0.8;">
+      Last updated: never
+    </span>
+  </div>
+
+  <!-- Wicket Popup -->
+  <div id="wicketPopup" class="popup hidden">
+    <div class="popup-content">
+      <h3>Select Wicket Type</h3>
+      <div class="popup-buttons">
+        <button data-type="B">Bowled</button>
+        <button data-type="C">Catch</button>
+        <button data-type="RO">Run Out</button>
+        <button data-type="1+RO">1+Run Out</button>
+        <button data-type="2+RO">2+Run Out</button>
+        <button data-type="LBW">LBW</button>
+        <button data-type="ST">Stumped</button>
+        <button data-type="HT">Hit Wicket</button>
+        <button data-type="W">Generic</button>
+      </div>
+      <button id="closePopup" class="secondary">Cancel</button>
     </div>
   </div>
 </body>
