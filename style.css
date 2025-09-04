@@ -111,21 +111,6 @@ button:disabled { opacity: .5; cursor: not-allowed; filter: grayscale(.2); }
 .status.ok { color: var(--ok); border-left-color: var(--ok); }
 .status.bad { color: var(--danger); border-left-color: var(--danger); }
 
-/* Mobile-only details toggle button */
-.toggle-details {
-  display: none;
-  width: 100%;
-  margin-top: 8px;
-  padding: 10px 12px;
-  border: 0;
-  border-radius: 10px;
-  background: var(--accent2);
-  color: #000;
-  font-weight: 800;
-  cursor: pointer;
-}
-.toggle-details:active { transform: translateY(1px); }
-
 .controls {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
@@ -208,11 +193,12 @@ button:disabled { opacity: .5; cursor: not-allowed; filter: grayscale(.2); }
 
 /* ===== Mobile single-screen compact mode ===== */
 @media (max-width: 480px) {
+  /* Fill the screen in 3 rows: title, content, controls */
   .wrap {
-    min-height: 100svh;
-    min-height: 100dvh;
+    min-height: 100svh; /* modern */
+    min-height: 100dvh; /* safari 16+ */
     display: grid;
-    grid-template-rows: auto auto 1fr auto; /* title, setup/status/toggle, cards, controls */
+    grid-template-rows: auto 1fr auto;
     margin: 12px auto;
   }
 
@@ -221,14 +207,11 @@ button:disabled { opacity: .5; cursor: not-allowed; filter: grayscale(.2); }
 
   h1 { font-size: 1.1rem; margin: 0 0 6px; }
 
-  /* Show the toggle button on mobile */
-  .toggle-details { display: block; }
-
   .cards {
     grid-template-columns: 1fr;
     gap: 8px;
     margin-top: 8px;
-    overflow: hidden; /* non-details: no scroll */
+    overflow: hidden; /* avoid page scroll */
   }
 
   .card { padding: 10px; }
@@ -237,14 +220,9 @@ button:disabled { opacity: .5; cursor: not-allowed; filter: grayscale(.2); }
 
   .scoreline strong { font-size: 1.5rem; }
   .rr { margin-left: 6px; }
-
-  /* Compact hides details by default */
+  /* Trim less-critical info to keep single-screen */
   .hint, .over-summary { display: none !important; }
-
-  /* When user taps 'Show details', reveal and allow scroll */
-  body.details .hint,
-  body.details .over-summary { display: block !important; }
-  body.details .cards { overflow: auto; }
+  .extras small { display: none; }
 
   .status { font-size: .9rem; padding: 8px; margin-top: 8px; }
 
@@ -260,3 +238,40 @@ button:disabled { opacity: .5; cursor: not-allowed; filter: grayscale(.2); }
   }
   .controls button { min-height: 44px; font-size: .95rem; padding: 10px 0; }
 }
+/* Popup styles */
+.popup {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,.6);
+  z-index: 1000;
+}
+.popup.hidden { display: none; }
+
+.popup-content {
+  background: #1e3d2f;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0,0,0,.5);
+  text-align: center;
+  max-width: 320px;
+}
+.popup-content h3 { margin-top: 0; margin-bottom: 12px; }
+.popup-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.popup-buttons button {
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: none;
+  background: var(--accent2);
+  font-weight: bold;
+}
+.popup-buttons button:hover { background: var(--accent-hover); }
+
