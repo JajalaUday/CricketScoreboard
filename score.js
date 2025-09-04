@@ -1,561 +1,126 @@
 (() => {
   'use strict';
 
-  const TEAM_A = 0;
-  const TEAM_B = 1;
-
-  // ------ ELEMENT QUICKGET ------
+  const TEAM_A = 0, TEAM_B = 1;
   const $ = (id) => document.getElementById(id);
 
   // Setup inputs
-  const elTeamAName = $('teamAName');
-  const elTeamBName = $('teamBName');
-  const elOversPer  = $('oversPerInnings');
-  const elWktsPer   = $('wicketsPerInnings');
-  const elStart     = $('startMatch');
-  const elNewMatch  = $('newMatch');
+  const elTeamAName=$('teamAName'), elTeamBName=$('teamBName'),
+        elOversPer=$('oversPerInnings'), elWktsPer=$('wicketsPerInnings'),
+        elStart=$('startMatch'), elNewMatch=$('newMatch');
 
-  // Cards & fields
-  const elNameA   = $('nameA');
-  const elRunsA   = $('runsA');
-  const elWktsA   = $('wktsA');
-  const elOversA  = $('oversA');
-  const elRRA     = $('rrA');
-  const elHintA   = $('hintA');
-  const elExtrasA = $('extrasA');
-  const elWDA     = $('wdA');
-  const elNBA     = $('nbA');
-  const elBadgeA  = $('badgeA');
-  const elCardA   = $('cardA');
+  // Cards
+  const elNameA=$('nameA'), elRunsA=$('runsA'), elWktsA=$('wktsA'), elOversA=$('oversA'), elRRA=$('rrA'),
+        elHintA=$('hintA'), elExtrasA=$('extrasA'), elWDA=$('wdA'), elNBA=$('nbA'), elBadgeA=$('badgeA');
+  const elNameB=$('nameB'), elRunsB=$('runsB'), elWktsB=$('wktsB'), elOversB=$('oversB'), elRRB=$('rrB'),
+        elHintB=$('hintB'), elExtrasB=$('extrasB'), elWDB=$('wdB'), elNBB=$('nbB'), elBadgeB=$('badgeB');
+  const elOversAList=$('oversAList'), elOversBList=$('oversBList');
 
-  const elNameB   = $('nameB');
-  const elRunsB   = $('runsB');
-  const elWktsB   = $('wktsB');
-  const elOversB  = $('oversB');
-  const elRRB     = $('rrB');
-  const elHintB   = $('hintB');
-  const elExtrasB = $('extrasB');
-  const elWDB     = $('wdB');
-  const elNBB     = $('nbB');
-  const elBadgeB  = $('badgeB');
-  const elCardB   = $('cardB');
+  // Chase
+  const elChaseBox=$('chaseBox'), elTargetVal=$('targetVal'), elNeedVal=$('needVal'),
+        elBallsLeft=$('ballsLeftVal'), elReqRR=$('reqRR');
 
-  // Over summary containers
-  const elOversAList = $('oversAList');
-  const elOversBList = $('oversBList');
-
-  // Chase panel (Team B only)
-  const elChaseBox  = $('chaseBox');
-  const elTargetVal = $('targetVal');
-  const elNeedVal   = $('needVal');
-  const elBallsLeft = $('ballsLeftVal');
-  const elReqRR     = $('reqRR');
-
-  // Status & mobile toggle
-  const elStatus = $('status');
-  const elToggleDetails = $('toggleDetails');
-  elStatus.setAttribute('role', 'status');
-  elStatus.setAttribute('aria-live', 'polite');
+  // Status
+  const elStatus=$('status');
 
   // Controls
   const btn = {
-    dot: $('dot'), r1: $('r1'), r2: $('r2'), r3: $('r3'), r4: $('r4'), r6: $('r6'),
-    wkt: $('wkt'), wd: $('wd'), nb: $('nb'),
-    undo: $('undo'), end: $('endInnings')
+    dot:$('dot'), r1:$('r1'), r2:$('r2'), r3:$('r3'), r4:$('r4'), r6:$('r6'),
+    wkt:$('wkt'), wd:$('wd'), nb:$('nb'), undo:$('undo'), end:$('endInnings')
   };
+  const scoringBtnIds=['dot','r1','r2','r3','r4','r6','wkt','wd','nb','end'];
 
-  // Scoring buttons that should disable when you can't score
-  const scoringBtnIds = ['dot','r1','r2','r3','r4','r6','wkt','wd','nb','end'];
+  // Helpers
+  const oversStr=(b)=>`${Math.floor(b/6)}.${b%6}`;
+  const rr=(r,b)=>b>0?(r/(b/6)):null;
+  const fmtRR=(n)=>(n==null||!isFinite(n))?'—':n.toFixed(2);
+  const totalExtras=(inn)=>inn.wides+inn.noballs;
+  const makeOver=()=>({balls:[],runs:0,wkts:0});
+  const blankInnings=(name)=>({name,runs:0,wickets:0,balls:0,wides:0,noballs:0,concluded:false,overs:[],currOver:makeOver()});
 
-  // ------ STATE HELPERS ------
-  const oversStr = (balls) => `${Math.floor(balls/6)}.${balls%6}`;
-  const rr = (runs, balls) => balls > 0 ? (runs / (balls/6)) : null;
-  const fmtRR = (n) => (n == null || !isFinite(n)) ? '—' : n.toFixed(2);
-  const totalExtras = (inn) => inn.wides + inn.noballs;
+  // Match state
+  const match={maxOvers:null,maxBalls:null,maxWickets:10,batting:TEAM_A,
+               innings:[blankInnings('Team A'),blankInnings('Team B')],
+               started:false,matchOver:false,target:null};
 
-  // Over & innings factories
-  const makeOver = () => ({ balls: [], runs: 0, wkts: 0 });
-  const blankInnings = (name) => ({
-    name,
-    runs: 0,
-    wickets: 0,
-    balls: 0,            // legal balls only
-    wides: 0,
-    noballs: 0,
-    concluded: false,
-    overs: [],           // completed overs
-    currOver: makeOver() // live over
-  });
+  // Undo
+  const history=[];
+  const snapshot=()=>JSON.parse(JSON.stringify(match));
+  const pushHistory=()=>history.push(snapshot());
+  function undoLast(){if(!history.length)return;Object.assign(match,history.pop());render();}
 
-  // ------ MATCH STATE ------
-  const match = {
-    maxOvers: null,
-    maxBalls: null,      // overs * 6
-    maxWickets: 10,      // configurable
-    batting: TEAM_A,
-    innings: [blankInnings('Team A'), blankInnings('Team B')],
-    started: false,
-    matchOver: false,
-    target: null         // Team B target = Team A runs + 1
-  };
+  const curr=()=>match.innings[match.batting];
+  function setScoringEnabled(en){scoringBtnIds.forEach(id=>btn[id].disabled=!en);}
+  function updateUndoEnabled(){btn.undo.disabled=history.length===0;}
+  function setBadge(el,t,cls){el.textContent=t;el.className='badge';if(cls)el.classList.add(cls);}
+  function finalizeCurrentOver(inn){if(inn.currOver&&inn.currOver.balls.length){inn.overs.push(inn.currOver);inn.currOver=makeOver();}}
+  function recordBall(inn,token,runsDelta=0,{isLegal=false,isWicket=false}={}){inn.currOver.balls.push(token);if(runsDelta)inn.currOver.runs+=runsDelta;if(isWicket)inn.currOver.wkts+=1;if(isLegal&&inn.balls%6===0)finalizeCurrentOver(inn);}
 
-  // History stack for Undo (snapshots before each scoring action)
-  const history = [];
-  const snapshot = () => JSON.parse(JSON.stringify(match));
-  function pushHistory() { history.push(snapshot()); }
-  function undoLast() {
-    if (!history.length) return;
-    const prev = history.pop();
-    // Restore top-level fields
-    match.maxOvers   = prev.maxOvers;
-    match.maxBalls   = prev.maxBalls;
-    match.maxWickets = prev.maxWickets;
-    match.batting    = prev.batting;
-    match.innings    = prev.innings;
-    match.started    = prev.started;
-    match.matchOver  = prev.matchOver;
-    match.target     = prev.target;
-    render();
-  }
-
-  const curr  = () => match.innings[match.batting];
-  const other = () => match.innings[match.batting === TEAM_A ? TEAM_B : TEAM_A];
-
-  function setScoringEnabled(enabled) {
-    scoringBtnIds.forEach(id => { const b = btn[id]; if (b) b.disabled = !enabled; });
-  }
-  function updateUndoEnabled() {
-    if (btn.undo) btn.undo.disabled = history.length === 0;
-  }
-
-  // Badge helper
-  function setBadge(el, text, cls) {
-    el.textContent = text;
-    el.classList.remove('batting', 'chasing', 'done');
-    if (cls) el.classList.add(cls);
-  }
-
-  // Record and finalize overs
-  function finalizeCurrentOver(inn) {
-    if (inn.currOver && inn.currOver.balls.length) {
-      inn.overs.push(inn.currOver);
-      inn.currOver = makeOver();
-    }
-  }
-
-  function recordBall(inn, token, runsDelta = 0, { isLegal = false, isWicket = false } = {}) {
-    // token: '0','1','2','3','4','6','W','Wd','Nb'
-    inn.currOver.balls.push(token);
-    if (runsDelta) inn.currOver.runs += runsDelta;
-    if (isWicket)  inn.currOver.wkts += 1;
-
-    // Close over after 6 legal balls (extras don't count as legal)
-    if (isLegal && inn.balls % 6 === 0) {
-      finalizeCurrentOver(inn);
-    }
-  }
-
-  // Close current innings immediately
-  function closeCurrentInnings() {
-    const c = curr();
-    if (c.concluded) return;
-
-    finalizeCurrentOver(c); // capture partial live over
-    c.concluded = true;
-
-    if (match.batting === TEAM_A) {
-      const A = match.innings[TEAM_A];
-      match.target = A.runs + 1;
-      match.batting = TEAM_B;
-      elStatus.className = 'status';
-      elStatus.textContent = `Second innings begins. ${match.innings[TEAM_B].name} need ${match.target} to win.`;
-    } else {
-      decideMatch();
-    }
-  }
-
-  // Compact mode toggle for mobile (single-screen) + details button visibility
-function updateCompact() {
-  const isMobile = window.matchMedia('(max-width: 480px)').matches;
-  // ✅ Keep compact mode even after the match finishes
-  const shouldCompact = isMobile && match.started; // (removed "!match.matchOver")
-  document.body.classList.toggle('compact', shouldCompact);
-
-  // Show the details button whenever we're in compact mode (match started),
-  // including after match end so users can expand summaries.
-  const showToggle = shouldCompact && match.started;
-  elToggleDetails.classList.toggle('hidden', !showToggle);
-
-  // If we leave compact mode (e.g., rotate to desktop width), clear details state
-  if (!shouldCompact) {
-    document.body.classList.remove('details');
-    updateDetailsButtonLabel();
-  }
+  // Wicket with prompt
+  // Show popup
+function wicket() {
+  if (!ensureInningsOpen()) return;
+  pushHistory();
+  $('wicketPopup').classList.remove('hidden');
 }
 
-
-  // Details toggle behavior
-  function updateDetailsButtonLabel() {
-    const on = document.body.classList.contains('details');
-    elToggleDetails.textContent = on ? 'Hide details' : 'Show details';
-    elToggleDetails.setAttribute('aria-pressed', on ? 'true' : 'false');
-  }
-  function toggleDetails() {
-    if (!document.body.classList.contains('compact')) return;
-    document.body.classList.toggle('details');
-    updateDetailsButtonLabel();
-  }
-
-  // Guard: stop scoring if innings closed
-  function ensureInningsOpen() {
-    const c = curr();
-    if (match.maxBalls != null && c.balls >= match.maxBalls) {
-      closeCurrentInnings();
-      render();
-      return false;
-    }
-    if (c.concluded || match.matchOver || !match.started) return false;
-    return true;
-  }
-
-  // ------ RENDER ------
-  function renderOvers(inn, containerEl) {
-    if (!containerEl) return;
-
-    const list = inn.currOver.balls.length && !inn.concluded
-      ? [...inn.overs, { ...inn.currOver, live: true }]
-      : [...inn.overs];
-
-    const show = list.slice(-5); // last 5 overs
-    const baseIndex = list.length - show.length;
-
-    if (show.length === 0) {
-      containerEl.innerHTML = '<div class="over-empty">No overs yet.</div>';
-      return;
-    }
-
-    containerEl.innerHTML = show.map((ov, idx) => {
-      const ovNum = baseIndex + idx + 1;
-      const balls = ov.balls.map(tok => {
-        const t = String(tok);
-        const cls = t === 'W' ? 'W' : (t === '4' ? 'b4' : (t === '6' ? 'b6' : (t.toLowerCase()==='wd' ? 'wd' : (t.toLowerCase()==='nb' ? 'nb' : ''))));
-        return `<span class="ball ${cls}">${t}</span>`;
-      }).join(' ');
-      const liveTag = ov.live ? ' (live)' : '';
-      return `
-        <div class="over-row">
-          <span class="ov-no">Ov ${ovNum}${liveTag}</span>
-          <span class="ov-balls">${balls}</span>
-          <span class="ov-tally">${ov.runs}/${ov.wkts}</span>
-        </div>`;
-    }).join('');
-  }
-
-  function render() {
-    // Names
-    elNameA.textContent = match.innings[TEAM_A].name;
-    elNameB.textContent = match.innings[TEAM_B].name;
-
-    // Team A
-    const A = match.innings[TEAM_A];
-    elRunsA.textContent   = A.runs;
-    elWktsA.textContent   = A.wickets;
-    elOversA.textContent  = oversStr(A.balls);
-    elRRA.textContent     = A.balls ? `(RR: ${fmtRR(rr(A.runs, A.balls))})` : '';
-    elHintA.textContent   = `Balls this over: ${A.balls % 6}/6`;
-    elExtrasA.textContent = totalExtras(A);
-    elWDA.textContent     = A.wides;
-    elNBA.textContent     = A.noballs;
-
-    // Team B
-    const B = match.innings[TEAM_B];
-    elRunsB.textContent   = B.runs;
-    elWktsB.textContent   = B.wickets;
-    elOversB.textContent  = oversStr(B.balls);
-    elRRB.textContent     = B.balls ? `(RR: ${fmtRR(rr(B.runs, B.balls))})` : '';
-    elHintB.textContent   = `Balls this over: ${B.balls % 6}/6`;
-    elExtrasB.textContent = totalExtras(B);
-    elWDB.textContent     = B.wides;
-    elNBB.textContent     = B.noballs;
-
-    // Badges & highlight
-    const secondInnings = match.started && match.target != null;
-    if (!match.started) {
-      elCardA.classList.add('active'); elCardB.classList.remove('active');
-      setBadge(elBadgeA, 'Batting', 'batting');
-      setBadge(elBadgeB, 'Yet to bat', null);
-    } else if (match.batting === TEAM_A) {
-      elCardA.classList.add('active'); elCardB.classList.remove('active');
-      setBadge(elBadgeA, A.concluded ? 'Innings over' : 'Batting', A.concluded ? 'done' : 'batting');
-      setBadge(elBadgeB, B.concluded ? 'Innings over' : (B.balls > 0 ? 'Fielding' : 'Yet to bat'), B.concluded ? 'done' : null);
-    } else {
-      elCardB.classList.add('active'); elCardA.classList.remove('active');
-      setBadge(elBadgeB, B.concluded ? 'Innings over' : (secondInnings ? 'Chasing' : 'Batting'), B.concluded ? 'done' : (secondInnings ? 'chasing' : 'batting'));
-      setBadge(elBadgeA, A.concluded ? 'Innings over' : 'Fielding', A.concluded ? 'done' : null);
-    }
-
-    // Chase UI (Team B only in 2nd innings)
-    if (match.started && match.target != null) {
-      const ballsLeft = Math.max(0, match.maxBalls - B.balls);
-      const need = Math.max(0, match.target - B.runs);
-      elChaseBox.classList.remove('hidden');
-      elTargetVal.textContent = match.target;
-      elNeedVal.textContent = need;
-      elBallsLeft.textContent = ballsLeft;
-      elReqRR.textContent = (need > 0 && ballsLeft > 0) ? (need / (ballsLeft/6)).toFixed(2) : (need <= 0 ? '0.00' : '—');
-    } else {
-      elChaseBox.classList.add('hidden');
-    }
-
-    // Status line (always keep fresh to avoid stale messages after undo)
-    if (!match.started) {
-      elStatus.className = 'status';
-      elStatus.textContent = 'Set up the match to begin.';
-    } else if (!match.matchOver) {
-      if (match.batting === TEAM_A) {
-        elStatus.className = 'status';
-        elStatus.textContent = `${A.name} are batting.`;
-      } else {
-        if (match.target != null) {
-          const ballsLeft = Math.max(0, match.maxBalls - B.balls);
-          const need = Math.max(0, match.target - B.runs);
-          elStatus.className = 'status';
-          elStatus.textContent = `Chase on: ${B.name} need ${need} off ${ballsLeft} balls.`;
-        } else {
-          elStatus.className = 'status';
-          elStatus.textContent = `${B.name} are batting.`;
-        }
-      }
-    }
-    // If match.matchOver === true, keep whatever final message was set
-
-    // Controls availability
-    const c = curr();
-    const canScore = match.started && !match.matchOver && !c.concluded && (match.maxBalls == null || c.balls < match.maxBalls);
-    setScoringEnabled(canScore);
-    updateUndoEnabled();
-
-    // Over summaries
-    renderOvers(match.innings[TEAM_A], elOversAList);
-    renderOvers(match.innings[TEAM_B], elOversBList);
-
-    // Apply/clear compact mode and manage details toggle label
-    updateCompact();
-    updateDetailsButtonLabel();
-  }
-
-  // ------ CORE LOGIC ------
-  function startMatch() {
-    const nameA = (elTeamAName.value || 'Team A').trim();
-    const nameB = (elTeamBName.value || 'Team B').trim();
-    const overs = parseInt(elOversPer.value, 10);
-    const wkts  = parseInt(elWktsPer.value, 10);
-
-    if (!Number.isFinite(overs) || overs < 1) {
-      alert('Please enter valid overs per innings, e.g., 20.');
-      return;
-    }
-
-    match.maxOvers   = overs;
-    match.maxBalls   = overs * 6;
-    match.maxWickets = (Number.isFinite(wkts) && wkts >= 1) ? wkts : 10;
-
-    match.innings[TEAM_A] = blankInnings(nameA);
-    match.innings[TEAM_B] = blankInnings(nameB);
-    match.batting   = TEAM_A;
-    match.started   = true;
-    match.matchOver = false;
-    match.target    = null;
-
-    // Clear history at match start
-    history.length = 0;
-
-    elStatus.textContent = `Match started. ${nameA} are batting first. (${match.maxWickets} wicket innings)`;
-    render();
-  }
-
-  function newMatch() {
-    elTeamAName.value = '';
-    elTeamBName.value = '';
-    elOversPer.value  = '';
-    if (elWktsPer) elWktsPer.value = '';
-
-    match.maxOvers = null;
-    match.maxBalls = null;
-    match.maxWickets = 10;
-    match.batting  = TEAM_A;
-    match.innings  = [blankInnings('Team A'), blankInnings('Team B')];
-    match.started  = false;
-    match.matchOver= false;
-    match.target   = null;
-
-    // Clear UI states and history
-    document.body.classList.remove('compact', 'details');
-    history.length = 0;
-
-    render();
-  }
-
-  function afterAction() {
-    autoChecks();
-    render();
-  }
-
-  // Legal deliveries (advance ball)
-  function addRuns(r) {
-    if (!ensureInningsOpen()) return;
-    pushHistory();
-    const c = curr();
-    c.runs += r;
-    c.balls += 1;                 // advance ball
-    recordBall(c, String(r), r, { isLegal: true });
-    afterAction();
-  }
-
-  function wicket() {
-    if (!ensureInningsOpen()) return;
-    pushHistory();
+// Handle popup choice
+document.querySelectorAll('#wicketPopup .popup-buttons button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const type = btn.dataset.type;
     const c = curr();
     if (c.wickets < match.maxWickets) {
+      let runs = 0;
+      if (type === "1+RO") { runs = 1; c.runs += 1; }
+      if (type === "2+RO") { runs = 2; c.runs += 2; }
       c.wickets += 1;
-      c.balls += 1;               // advance ball
-      recordBall(c, 'W', 0, { isLegal: true, isWicket: true });
+      c.balls += 1;
+      recordBall(c, type, runs, { isLegal:true, isWicket:true });
       afterAction();
     }
-  }
-
-  // Extras (do NOT advance ball)
-  function wide() {
-    if (!ensureInningsOpen()) return;
-    pushHistory();
-    const c = curr();
-    c.runs += 1;
-    c.wides += 1;
-    recordBall(c, 'Wd', 1, { isLegal: false });
-    afterAction();
-  }
-
-  function noBall() {
-    if (!ensureInningsOpen()) return;
-    pushHistory();
-    const c = curr();
-    c.runs += 1;
-    c.noballs += 1;
-    recordBall(c, 'Nb', 1, { isLegal: false });
-    afterAction();
-  }
-
-  function endInningsManual() {
-    const c = curr();
-    if (!match.started || c.concluded || match.matchOver) return;
-    pushHistory();
-    closeCurrentInnings();
-    render();
-  }
-
-  // Auto close: all out or balls exhausted; check win during chase
-  function autoChecks() {
-    const c = curr();
-
-    // hard close at balls cap
-    if (match.maxBalls != null && c.balls >= match.maxBalls) {
-      closeCurrentInnings();
-      return;
-    }
-
-    // all out
-    if (c.wickets >= match.maxWickets) {
-      closeCurrentInnings();
-      return;
-    }
-
-    // instant win during chase (Team B)
-    if (match.batting === TEAM_B && match.target != null) {
-      const B = match.innings[TEAM_B];
-      if (B.runs >= match.target) {
-        match.matchOver = true;
-        B.concluded = true;         // ensure badges show over
-        finalizeCurrentOver(B);     // push partial live over
-        elStatus.className = 'status ok';
-        elStatus.textContent = `✅ ${B.name} win with ${Math.max(0, match.maxBalls - B.balls)} ball(s) left and ${match.maxWickets - B.wickets} wicket(s).`;
-        setScoringEnabled(false);
-        updateCompact();            // keep compact mode until new match
-      }
-    }
-  }
-
-  function decideMatch() {
-  const A = match.innings[TEAM_A];
-  const B = match.innings[TEAM_B];
-  match.matchOver = true;
-
-  if (B.runs > A.runs) {
-    // B chased successfully (you still show wickets/balls elsewhere on instant win)
-    elStatus.className = 'status ok';
-    elStatus.textContent = `✅ ${B.name} win.`;
-  } else if (B.runs < A.runs) {
-    // A defended: show run-margin instead of "Team B fall short..."
-    const margin = A.runs - B.runs;
-    const word = margin === 1 ? 'run' : 'runs';
-    elStatus.className = 'status ok';
-    elStatus.textContent = `✅ ${A.name} won the match by ${margin} ${word}.`;
-  } else {
-    elStatus.className = 'status';
-    elStatus.textContent = '⏸️ Match tied.';
-  }
-
-  setScoringEnabled(false);
-  updateCompact();
-}
-
-
-  // ------ WIRE UI ------
-  elStart.addEventListener('click', startMatch);
-  elNewMatch.addEventListener('click', newMatch);
-
-  btn.dot.addEventListener('click', () => addRuns(0));
-  btn.r1 .addEventListener('click', () => addRuns(1));
-  btn.r2 .addEventListener('click', () => addRuns(2));
-  btn.r3 .addEventListener('click', () => addRuns(3));
-  btn.r4 .addEventListener('click', () => addRuns(4));
-  btn.r6 .addEventListener('click', () => addRuns(6));
-  btn.wkt.addEventListener('click', wicket);
-
-  btn.wd .addEventListener('click', wide);
-  btn.nb .addEventListener('click', noBall);
-
-  btn.undo.addEventListener('click', undoLast);
-  btn.end.addEventListener('click', endInningsManual);
-
-  // Details toggle
-  elToggleDetails.addEventListener('click', toggleDetails);
-
-  // Keyboard shortcuts (ignored when typing in inputs)
-  const keymap = {
-    '0': () => addRuns(0), '.': () => addRuns(0),
-    '1': () => addRuns(1), '2': () => addRuns(2), '3': () => addRuns(3),
-    '4': () => addRuns(4), '6': () => addRuns(6),
-    'w': wicket, 'W': wicket,
-    'q': wide,   'Q': wide,
-    'n': noBall, 'N': noBall,
-    'u': undoLast, 'U': undoLast,
-    'x': endInningsManual, 'X': endInningsManual
-  };
-  document.addEventListener('keydown', (e) => {
-    const ae = document.activeElement;
-    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
-    const fn = keymap[e.key];
-    if (fn) { e.preventDefault(); fn(); }
+    $('wicketPopup').classList.add('hidden');
   });
+});
 
-  // Keep compact mode in sync with orientation/resize
-  window.addEventListener('resize', () => { updateCompact(); updateDetailsButtonLabel(); });
+// Cancel button
+$('closePopup').addEventListener('click', () => {
+  history.pop(); // undo snapshot
+  $('wicketPopup').classList.add('hidden');
+});
 
-  // Initial paint
+
+  // Other actions
+  function addRuns(r){if(!ensureInningsOpen())return;pushHistory();const c=curr();c.runs+=r;c.balls+=1;recordBall(c,String(r),r,{isLegal:true});afterAction();}
+  function wide(){if(!ensureInningsOpen())return;pushHistory();const c=curr();c.runs+=1;c.wides+=1;recordBall(c,'Wd',1,{isLegal:false});afterAction();}
+  function noBall(){if(!ensureInningsOpen())return;pushHistory();const c=curr();c.runs+=1;c.noballs+=1;recordBall(c,'Nb',1,{isLegal:false});afterAction();}
+  function endInningsManual(){if(!match.started||curr().concluded||match.matchOver)return;pushHistory();closeCurrentInnings();render();}
+
+  // Auto checks
+  function autoChecks(){const c=curr();if(match.maxBalls!=null&&c.balls>=match.maxBalls)return closeCurrentInnings();if(c.wickets>=match.maxWickets)return closeCurrentInnings();if(match.batting===TEAM_B&&match.target!=null){const B=match.innings[TEAM_B];if(B.runs>=match.target){match.matchOver=true;B.concluded=true;finalizeCurrentOver(B);elStatus.textContent=`✅ ${B.name} win!`;setScoringEnabled(false);}}}
+  function closeCurrentInnings(){const c=curr();if(c.concluded)return;finalizeCurrentOver(c);c.concluded=true;if(match.batting===TEAM_A){match.target=match.innings[TEAM_A].runs+1;match.batting=TEAM_B;elStatus.textContent=`Second innings begins. ${match.innings[TEAM_B].name} need ${match.target} to win.`;}else{decideMatch();}}
+  function decideMatch(){const A=match.innings[TEAM_A],B=match.innings[TEAM_B];match.matchOver=true;if(B.runs>A.runs)elStatus.textContent=`✅ ${B.name} win.`;else if(B.runs<A.runs){const m=A.runs-B.runs;elStatus.textContent=`✅ ${A.name} won by ${m} run${m>1?'s':''}.`;}else elStatus.textContent='⏸️ Match tied.';setScoringEnabled(false);}
+  function ensureInningsOpen(){const c=curr();if(match.maxBalls!=null&&c.balls>=match.maxBalls){closeCurrentInnings();render();return false;}if(c.concluded||match.matchOver||!match.started)return false;return true;}
+  function afterAction(){autoChecks();render();}
+
+  // Render overs
+  function renderOvers(inn,el){if(!el)return;const list=inn.currOver.balls.length&&!inn.concluded?[...inn.overs,{...inn.currOver,live:true}]:[...inn.overs];if(list.length===0){el.innerHTML='<div class="over-empty">No overs yet.</div>';return;}el.innerHTML=list.slice(-5).map((ov,idx)=>{const ovNum=list.length-5+idx+1;const balls=ov.balls.map(t=>{let cls='';if(['W','C','B','RO','LBW','ST','HT'].includes(t)||t.includes('+RO'))cls='W';else if(t==='4')cls='b4';else if(t==='6')cls='b6';else if(t.toLowerCase()==='wd')cls='wd';else if(t.toLowerCase()==='nb')cls='nb';return `<span class="ball ${cls}">${t}</span>`;}).join(' ');return `<div class="over-row"><span class="ov-no">Ov ${ovNum}${ov.live?' (live)':''}</span><span class="ov-balls">${balls}</span><span class="ov-tally">${ov.runs}/${ov.wkts}</span></div>`;}).join('');}
+
+  // Render UI
+  function render(){const A=match.innings[TEAM_A],B=match.innings[TEAM_B];elNameA.textContent=A.name;elNameB.textContent=B.name;elRunsA.textContent=A.runs;elWktsA.textContent=A.wickets;elOversA.textContent=oversStr(A.balls);elRRA.textContent=A.balls?`(RR:${fmtRR(rr(A.runs,A.balls))})`:'';elHintA.textContent=`Balls this over:${A.balls%6}/6`;elExtrasA.textContent=totalExtras(A);elWDA.textContent=A.wides;elNBA.textContent=A.noballs;elRunsB.textContent=B.runs;elWktsB.textContent=B.wickets;elOversB.textContent=oversStr(B.balls);elRRB.textContent=B.balls?`(RR:${fmtRR(rr(B.runs,B.balls))})`:'';elHintB.textContent=`Balls this over:${B.balls%6}/6`;elExtrasB.textContent=totalExtras(B);elWDB.textContent=B.wides;elNBB.textContent=B.noballs;if(!match.started)elStatus.textContent='Set up the match to begin.';else if(!match.matchOver){if(match.batting===TEAM_A)elStatus.textContent=`${A.name} are batting.`;else elStatus.textContent=`${B.name} need ${Math.max(0,match.target-B.runs)} off ${Math.max(0,match.maxBalls-B.balls)} balls.`;}setScoringEnabled(match.started&&!match.matchOver&&!curr().concluded);updateUndoEnabled();renderOvers(A,elOversAList);renderOvers(B,elOversBList);}
+  function startMatch(){const nameA=(elTeamAName.value||'Team A').trim(),nameB=(elTeamBName.value||'Team B').trim(),overs=parseInt(elOversPer.value,10),wkts=parseInt(elWktsPer.value,10);if(!overs||overs<1)return alert('Enter valid overs');match.maxOvers=overs;match.maxBalls=overs*6;match.maxWickets=wkts>=1?wkts:10;match.innings=[blankInnings(nameA),blankInnings(nameB)];match.batting=TEAM_A;match.started=true;match.matchOver=false;match.target=null;history.length=0;elStatus.textContent=`Match started. ${nameA} batting first.`;render();}
+  function newMatch(){elTeamAName.value=elTeamBName.value=elOversPer.value=elWktsPer.value='';Object.assign(match,{maxOvers:null,maxBalls:null,maxWickets:10,batting:TEAM_A,innings:[blankInnings('Team A'),blankInnings('Team B')],started:false,matchOver:false,target:null});history.length=0;render();}
+
+  // Wire events
+  elStart.addEventListener('click',startMatch);elNewMatch.addEventListener('click',newMatch);
+  btn.dot.addEventListener('click',()=>addRuns(0));btn.r1.addEventListener('click',()=>addRuns(1));btn.r2.addEventListener('click',()=>addRuns(2));
+  btn.r3.addEventListener('click',()=>addRuns(3));btn.r4.addEventListener('click',()=>addRuns(4));btn.r6.addEventListener('click',()=>addRuns(6));
+  btn.wkt.addEventListener('click',wicket);btn.wd.addEventListener('click',wide);btn.nb.addEventListener('click',noBall);
+  btn.undo.addEventListener('click',undoLast);btn.end.addEventListener('click',endInningsManual);
+
+  // Refresh
+  const elRefresh=$('refreshBtn'), elLastUpdated=$('lastUpdated');
+  function refreshScores(){render();elLastUpdated.textContent='Last updated: '+new Date().toLocaleTimeString();}
+  if(elRefresh)elRefresh.addEventListener('click',refreshScores);
+
   render();
-
-  // Expose for console debugging
-  window._score2 = {
-    startMatch, newMatch, addRuns, wicket, wide, noBall, endInningsManual, undoLast, match
-  };
 })();
